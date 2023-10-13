@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
+#include "state_machine.h"
 
 // Baudrate settings are defined in <asm/termbits.h>, which is
 // included by <termios.h>
@@ -71,7 +72,7 @@ int main(int argc, char *argv[])
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 0; // Inter-character timer unused
+    newtio.c_cc[VTIME] = 1; // Inter-character timer unused
     newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
@@ -94,46 +95,39 @@ int main(int argc, char *argv[])
     printf("New termios structure set\n");
 
     // Loop for input
-    unsigned char buf[BUF_SIZE] = {0}; 
-    unsigned char bufs[BUF_SIZE] = {0};
+    unsigned char buf[1] = {}; 
+    unsigned char bufs[BUF_SIZE] = {};
     
-
+    setStateMachine(SET_RES);
     while (STOP == FALSE)
     {
         
-        int bytes = read(fd, buf, BUF_SIZE);
- 
-        printf("xor= %d\n", buf[3]);
-            
-        printf("1antigo= %d\n", buf[1]);
-            
-        printf("2antigo= %d", buf[2]);
+        int bytes = read(fd, buf, 1);
+        if(bytes > 0){
+            printf("byte sent =0x%02x\n",buf[0]);
+            stateMachine(buf[0]);
+        }
         
-        if (bytes > 0 && (buf[1] ^ buf[2]) == buf[3]){
-        
-            
-            
+        if (state_machine_get_mode() == DONE){
             bufs[0] = FLAG;
             bufs[1] = A;
             bufs[2] = UA;
             bufs[3] = A ^ UA;
             bufs[4] = FLAG;
+                        
+            printf("A=0x%02x,", bufs[1]);
             
-            printf("xor= %d\n", bufs[3]);
-            
-            printf("1= %d\n", bufs[1]);
-            
-            printf("2= %d", bufs[2]);
+            printf("C=0x%02x,", bufs[2]);
+
+            printf("BCC=0x%02x,", bufs[3]);
             
             int bytes2 = write(fd, bufs, BUF_SIZE);
             
-            printf(":%s:%d\n", bufs, bytes2);
+            printf("Bytes written = %d\n", bytes2);
             
             STOP = TRUE;
               
         }
-
-        printf(":%s:%d\n", buf, bytes);
     }
 
     // The while() cycle should be changed in order to respect the specifications

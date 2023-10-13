@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <termios.h>
+#include "state_machine.h"
 #include <unistd.h>
 
 // Baudrate settings are defined in <asm/termbits.h>, which is
@@ -95,7 +96,7 @@ int main(int argc, char *argv[])
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 0; // Inter-character timer unused
+    newtio.c_cc[VTIME] = 1; // Inter-character timer unused
     newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
 
     // VTIME e VMIN should be changed in order to protect with a
@@ -128,12 +129,17 @@ int main(int argc, char *argv[])
 
     int counter = 1;
 
+    setStateMachine(UA_RES);
     while(STOP == FALSE){
        unsigned char buf_2[BUF_SIZE] = {};
-       bytes = read(fd,buf_2,BUF_SIZE);
-       if(bytes > 0 && (buf_2[1] ^ buf_2[2]) == (buf_2[3])){
+       bytes = read(fd,buf_2,1);
+       if(bytes > 0){
+        stateMachine(buf_2[0]);
+       }
+       if(state_machine_get_mode() == DONE){
+          struct state_machine state_machine = getStateMachine();
           STOP = TRUE;
-          printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",buf_2[1],buf_2[2],buf_2[3]);
+          printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",state_machine.a,state_machine.c,state_machine.bcc);
           alarm(0);
        }
        else if(counter == TRIES){
