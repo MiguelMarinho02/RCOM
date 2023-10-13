@@ -26,6 +26,8 @@
 #define A 0x01
 #define UA 0x07
 
+#define PACKET_SIZE 100
+
 
 volatile int STOP = FALSE;
 
@@ -107,8 +109,7 @@ int main(int argc, char *argv[])
             printf("byte sent =0x%02x\n",buf[0]);
             stateMachine(buf[0]);
         }
-        
-        if (state_machine_get_mode() == DONE){
+        if (state_machine_get_state() == DONE){
             bufs[0] = FLAG;
             bufs[1] = A;
             bufs[2] = UA;
@@ -130,8 +131,49 @@ int main(int argc, char *argv[])
         }
     }
 
-    // The while() cycle should be changed in order to respect the specifications
-    // of the protocol indicated in the Lab guide
+    printf("Now we go to data transfer\n");
+
+    resetStateMachine();
+    setStateMachine(I_REC);
+    STOP = FALSE;
+
+    while (STOP == FALSE)
+    {
+        
+        int bytes = read(fd, buf, 1);
+        if(bytes > 0){
+            printf("byte received =0x%02x\n",buf[0]);
+            stateMachine(buf[0]);
+        }
+        printf("state = %d\n",state_machine_get_state());
+        if (state_machine_get_state() == DONE){
+            struct state_machine state_machine = getStateMachine();
+            bufs[0] = FLAG;
+            bufs[1] = A_RECEIVER;
+            if(state_machine.c == CTRL_S(0)){
+                bufs[2] = RR(1);
+            }else{
+                bufs[2] = RR(0);
+            }
+            bufs[3] = BCC(bufs[1],bufs[2]);
+            bufs[4] = FLAG;
+                        
+            printf("A=0x%02x,", bufs[1]);
+            
+            printf("C=0x%02x,", bufs[2]);
+
+            printf("BCC=0x%02x,", bufs[3]);
+            
+            int bytes2 = write(fd, bufs, BUF_SIZE);
+            
+            printf("Bytes written = %d\n", bytes2);
+            
+            STOP = TRUE;
+              
+        }
+    }
+
+
 
     // Restore the old port settings
     if (tcsetattr(fd, TCSANOW, &oldtio) == -1)

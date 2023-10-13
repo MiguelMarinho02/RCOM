@@ -7,6 +7,6 @@
 #define SET 0x03
 #define UA 0x07
 #define DIC 0x0b
-#define RR (r) (r == 0) ? 0x05 : 0x85
-#define REJ (r) (r == 0) ? 0x01 : 0x81
-#define CTRL_S (r) (r == 0) ? 0x00 : 0x40
+#define RR(r) ((r == 0) ? 0x05 : 0x85)
+#define REJ(r) ((r == 0) ? 0x01 : 0x81)
+#define CTRL_S(r) ((r == 0) ? 0x00 : 0x40)

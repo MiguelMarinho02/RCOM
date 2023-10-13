@@ -28,6 +28,7 @@
 #define SET 0x03
 #define UA 0x07
 #define TRIES 5
+#define PACKET_SIZE 100
 
 volatile int STOP = FALSE;
 
@@ -48,6 +49,32 @@ int closePort(int fd, struct termios *oldtio){
     }
 
     close(fd);
+    return 0;
+}
+
+int writePackageInfo(int fd, unsigned char buffer[], int size, int frameNumber){
+    unsigned char buf[PACKET_SIZE + 6];
+    
+    buf[0] = FLAG;
+    buf[1] = A_SENDER;
+    buf[2] = CTRL_S(frameNumber);
+    buf[3] = BCC(buf[1],buf[2]);
+    printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",buf[1],buf[2],buf[3]);
+
+    int cont = 3;
+    unsigned char bcc2 = buffer[0];
+    for(int i = 0; i <= size; i++){
+        buf[i+4] = buffer[i]; 
+        cont++;
+        if(i != 0){
+            bcc2 ^= buffer[i];
+        }
+    }
+
+    buf[cont] = bcc2;
+    buf[cont+1] = FLAG;
+
+    write(fd, buf, cont+2);
     return 0;
 }
 
@@ -136,7 +163,7 @@ int main(int argc, char *argv[])
        if(bytes > 0){
         stateMachine(buf_2[0]);
        }
-       if(state_machine_get_mode() == DONE){
+       if(state_machine_get_state() == DONE){
           struct state_machine state_machine = getStateMachine();
           STOP = TRUE;
           printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",state_machine.a,state_machine.c,state_machine.bcc);
@@ -157,6 +184,50 @@ int main(int argc, char *argv[])
        }
     }    
 
+    printf("Now we go to data transfer\n");
+
+    resetStateMachine();
+    setStateMachine(RR_REC);
+    STOP = FALSE;
+    unsigned char info_buf[PACKET_SIZE] = {0x65,0x10,0x20,0x67}; //this is given by app layer I think
+    writePackageInfo(fd,info_buf,4,0); //the 4 number is also passed
+    int frameNumber = 0;
+
+    alarm(3);
+    counter = 0;
+
+    while(!STOP){ //this will be inside another loop so we can send multiple data, but for now it will stay like this
+       unsigned char buf_2[BUF_SIZE] = {};
+       bytes = read(fd,buf_2,1);
+       if(bytes > 0){
+        stateMachine(buf_2[0]);
+       }
+
+       if(state_machine_get_state() == DONE){
+          struct state_machine state_machine = getStateMachine();
+          STOP = TRUE;
+          printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",state_machine.a,state_machine.c,state_machine.bcc);
+          if(state_machine.c == RR(0)){
+            frameNumber = 0;
+          }
+          else{
+            frameNumber = 1;
+          }
+          alarm(0);
+       }
+       else if(counter == TRIES){
+        alarm(0);
+        closePort(fd,&oldtio);
+        exit(0);
+       }
+       else if(alarmEnabled == TRUE){  
+          alarmEnabled = FALSE;
+          writePackageInfo(fd,info_buf,4,frameNumber);
+          counter++;
+          printf("Try %d\n", counter);
+          alarm(3);
+       }
+    }
  
 
     // Wait until all bytes have been written to the serial port
