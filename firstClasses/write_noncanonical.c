@@ -156,7 +156,7 @@ int main(int argc, char *argv[])
 
     int counter = 1;
 
-    setStateMachine(UA_RES);
+    setStateMachine(UA_RES,TRANSMITER);
     while(STOP == FALSE){
        unsigned char buf_2[BUF_SIZE] = {};
        bytes = read(fd,buf_2,1);
@@ -187,9 +187,11 @@ int main(int argc, char *argv[])
     printf("Now we go to data transfer\n");
 
     resetStateMachine();
-    setStateMachine(RR_REC);
+    setStateMachine(RR_REC,TRANSMITER);
     STOP = FALSE;
-    unsigned char info_buf[PACKET_SIZE] = {0x65,0x10,0x20,0x67}; //this is given by app layer I think
+    unsigned char info_buf[PACKET_SIZE] = {0x10,0x20,0x40,0x60}; //this is given by app layer I think
+    //this is also fucked because of bcc2. Lets say we are in the middle of the data field. If the bcc of the previous numbers is somehow equal to the actual bcc2, it will skip the other half of the data.
+    //Currently have no idea on how to solve this. Maybe I need to ESC it?
     writePackageInfo(fd,info_buf,4,0); //the 4 number is also passed
     int frameNumber = 0;
 
@@ -228,7 +230,53 @@ int main(int argc, char *argv[])
           alarm(3);
        }
     }
- 
+
+    //Now we will disconnect
+    printf("Now we go to data disconnect\n");
+    resetStateMachine();
+    setStateMachine(DISC_REC,TRANSMITER);
+    buf[0] = FLAG;
+    buf[1] = A_SENDER;
+    buf[2] = DISC;
+    buf[3] = BCC(A_SENDER, DISC);
+    buf[4] = FLAG;
+    bytes = write(fd, buf, BUF_SIZE);
+    printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",buf[1],buf[2],buf[3]);
+    STOP = FALSE;
+    
+    while(STOP == FALSE){
+       unsigned char buf_2[BUF_SIZE] = {};
+       bytes = read(fd,buf_2,1);
+       if(bytes > 0){
+        stateMachine(buf_2[0]);
+       }
+       if(state_machine_get_state() == DONE){
+          struct state_machine state_machine = getStateMachine();
+          STOP = TRUE;
+          printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",state_machine.a,state_machine.c,state_machine.bcc);
+          buf[0] = FLAG;
+          buf[1] = A_SENDER;
+          buf[2] = UA;
+          buf[3] = BCC(A_SENDER, UA);
+          buf[4] = FLAG;
+          write(fd, buf, BUF_SIZE);
+          printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",buf[1],buf[2],buf[3]);
+          alarm(0);
+       }
+       else if(counter == TRIES){
+        alarm(0);
+        closePort(fd,&oldtio);
+        exit(0);
+       }
+       else if(alarmEnabled == TRUE){  
+          alarmEnabled = FALSE;
+          bytes = write(fd, buf, BUF_SIZE);
+          printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",buf[1],buf[2],buf[3]);
+          counter++;
+          printf("Try %d\n", counter);
+          alarm(3);
+       }
+    }
 
     // Wait until all bytes have been written to the serial port
     sleep(1);

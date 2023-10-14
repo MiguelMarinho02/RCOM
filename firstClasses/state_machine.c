@@ -2,10 +2,11 @@
 
 struct state_machine state_machine;
 
-void setStateMachine(enum mode mode){
+void setStateMachine(enum mode mode, enum type type){
     state_machine.mode = mode;
     state_machine.state = START;
     state_machine.curIndx = 0;
+    state_machine.type = type;
 }
 
 void resetStateMachine(){
@@ -53,7 +54,7 @@ void stateMachine(unsigned char byte){
         bcc2_rcv_process(byte);
         break;
     case DONE:
-        setStateMachine(state_machine.mode);
+        setStateMachine(state_machine.mode,state_machine.type);
         break;
     default:
         break;
@@ -61,7 +62,7 @@ void stateMachine(unsigned char byte){
 }
 
 void flag_rcv_process(unsigned char byte){
-    if(state_machine.mode == SET_RES || state_machine.mode == I_REC){
+    if(state_machine.type == READER){
         if(byte == FLAG){
             return;
         }
@@ -73,7 +74,7 @@ void flag_rcv_process(unsigned char byte){
             state_machine.state = START;
         }
     }
-    else if(state_machine.mode == UA_RES || state_machine.mode == RR_REC){
+    else if(state_machine.type == TRANSMITER){
         if(byte == FLAG){
             return;
         }
@@ -137,6 +138,18 @@ void a_rcv_process(unsigned char byte){
             state_machine.state = START;
         }
     }
+    else if(state_machine.mode == DISC_REC){
+        if(byte == FLAG){
+            state_machine.state = FLAG_RCV;
+        }
+        else if(byte == DISC){
+            state_machine.state = C_RCV;
+            state_machine.c = byte;
+        }
+        else{
+            state_machine.state = START;
+        }
+    }
     else{};
 }
 
@@ -154,7 +167,7 @@ void c_rcv_process(unsigned char byte){
 }
 
 void bcc_rcv_process(unsigned char byte){
-    if(state_machine.mode == SET_RES || state_machine.mode == UA_RES || state_machine.mode == RR_REC){
+    if(state_machine.mode == SET_RES || state_machine.mode == UA_RES || state_machine.mode == RR_REC || state_machine.mode == DISC_REC){
         if(byte == FLAG){
             state_machine.state = DONE;
         }
