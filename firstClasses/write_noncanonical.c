@@ -53,28 +53,44 @@ int closePort(int fd, struct termios *oldtio){
 }
 
 int writePackageInfo(int fd, unsigned char buffer[], int size, int frameNumber){
-    unsigned char buf[PACKET_SIZE + 6];
+    unsigned char buf[206];
     
     buf[0] = FLAG;
     buf[1] = A_SENDER;
     buf[2] = CTRL_S(frameNumber);
     buf[3] = BCC(buf[1],buf[2]);
-    printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",buf[1],buf[2],buf[3]);
+    printf("A=0x%02X,C=0x%02X,BCC1=0x%02X,",buf[1],buf[2],buf[3]);
 
-    int cont = 3;
     unsigned char bcc2 = buffer[0];
-    for(int i = 0; i <= size; i++){
-        buf[i+4] = buffer[i]; 
-        cont++;
-        if(i != 0){
-            bcc2 ^= buffer[i];
-        }
+    for(int i = 0; i < size; i++){
+        bcc2 ^= buffer[i];
     }
 
-    buf[cont] = bcc2;
-    buf[cont+1] = FLAG;
+    int count = 4;
+    for(int i = 0; i < size; i++){ 
+        if(buffer[i] == FLAG || buffer[i] == ESC){ //stuffing FLAG and ESC
+            buf[count] = 0x7d;
+            count++;
+            buf[count] = BCC(buffer[i],0x20);
+        }
+        else{
+            buf[count] = buffer[i];
+        }
+        count++;
+    }
 
-    write(fd, buf, cont+2);
+    if(bcc2 == FLAG || bcc2 == ESC){
+        buf[count] = 0x7d;
+        count++;
+        buf[count] = BCC(bcc2,0x20);
+    }
+    else{
+        buf[count] = bcc2;
+    }
+    printf("BCC2=0x%02X\n",buf[count]);
+    buf[count + 1] = FLAG;
+
+    write(fd, buf, count + 2);   //6 is the number of header bytes like flag,a,c,etc...
     return 0;
 }
 
@@ -189,7 +205,7 @@ int main(int argc, char *argv[])
     resetStateMachine();
     setStateMachine(RR_REC,TRANSMITER);
     STOP = FALSE;
-    unsigned char info_buf[PACKET_SIZE] = {0x10,0x20,0x40,0x60}; //this is given by app layer I think
+    unsigned char info_buf[PACKET_SIZE] = {0x7e,0x7e,0x7d,0x40}; //this is given by app layer I think
     //this is also fucked because of bcc2. Lets say we are in the middle of the data field. If the bcc of the previous numbers is somehow equal to the actual bcc2, it will skip the other half of the data.
     //Currently have no idea on how to solve this. Maybe I need to ESC it?
     writePackageInfo(fd,info_buf,4,0); //the 4 number is also passed

@@ -42,5 +42,5 @@ void bcc_rcv_process(unsigned char byte);
 
 void data_rcv_process(unsigned char byte);
 
-void bcc2_rcv_process();
+void bcc2_rcv_process(unsigned char byte);
 

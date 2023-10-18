@@ -161,6 +161,11 @@ int main(int argc, char *argv[])
         //printf("state = %d\n",state_machine_get_state());
         if (state_machine_get_state() == DONE){
             struct state_machine state_machine = getStateMachine();
+
+            for(int i = 0; i < 5;i++){
+                printf("D=0x%02x\n", state_machine.data[i]);
+            }
+
             bufs[0] = FLAG;
             bufs[1] = A_RECEIVER;
             if(state_machine.c == CTRL_S(0)){

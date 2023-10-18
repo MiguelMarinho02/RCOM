@@ -187,14 +187,9 @@ void bcc_rcv_process(unsigned char byte){
         }
         else{
             state_machine.state = DATA;
-            if(byte == 0x7d){
-                escapeDetected = 1;
-            }
-            else{
-                state_machine.bcc2 = byte;
-                state_machine.data[0] = byte;
-                state_machine.curIndx++;
-            }
+            state_machine.bcc2 = byte;
+            state_machine.data[0] = byte;
+            state_machine.curIndx++;
         }
     }
     else{};
