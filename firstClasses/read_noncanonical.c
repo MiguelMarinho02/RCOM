@@ -124,9 +124,9 @@ int main(int argc, char *argv[])
         }
         if (state_machine_get_state() == DONE){
             bufs[0] = FLAG;
-            bufs[1] = A;
+            bufs[1] = A_SENDER;
             bufs[2] = UA;
-            bufs[3] = A ^ UA;
+            bufs[3] = A_SENDER ^ UA;
             bufs[4] = FLAG;
                         
             printf("A=0x%02x,", bufs[1]);
@@ -161,13 +161,17 @@ int main(int argc, char *argv[])
         //printf("state = %d\n",state_machine_get_state());
         if (state_machine_get_state() == DONE){
             struct state_machine state_machine = getStateMachine();
+            if(state_machine.mode == DISC_REC){
+                STOP = TRUE;
+                break;
+            }
 
             for(int i = 0; i < 5;i++){
                 printf("D=0x%02x\n", state_machine.data[i]);
             }
 
             bufs[0] = FLAG;
-            bufs[1] = A_RECEIVER;
+            bufs[1] = A_SENDER;
             if(state_machine.c == CTRL_S(0)){
                 bufs[2] = RR(1);
             }else{
@@ -185,9 +189,9 @@ int main(int argc, char *argv[])
             int bytes2 = write(fd, bufs, BUF_SIZE);
             
             printf("Bytes written = %d\n", bytes2);
-            
-            STOP = TRUE;
-              
+
+            resetStateMachine();
+            setStateMachine(I_REC,READER);
         }
     }
 
@@ -195,41 +199,25 @@ int main(int argc, char *argv[])
     //Now we will disconnect
     printf("Now we go to data disconnect\n");
 
-    resetStateMachine();
-    setStateMachine(DISC_REC,READER);
     STOP = FALSE;
+     
+    bufs[0] = FLAG;
+    bufs[1] = A_RECEIVER;
+    bufs[2] = DISC;
+    bufs[3] = BCC(A,DISC);
+    bufs[4] = FLAG;
+                
+    printf("A=0x%02x,", bufs[1]);
     
-    while (STOP == FALSE)
-    {
-        
-        int bytes = read(fd, buf, 1);
-        if(bytes > 0){
-            printf("byte received =0x%02x\n",buf[0]);
-            stateMachine(buf[0]);
-        }
-        //printf("state = %d\n",state_machine_get_state());
-        if (state_machine_get_state() == DONE){
-            bufs[0] = FLAG;
-            bufs[1] = A;
-            bufs[2] = DISC;
-            bufs[3] = BCC(A,DISC);
-            bufs[4] = FLAG;
-                        
-            printf("A=0x%02x,", bufs[1]);
-            
-            printf("C=0x%02x,", bufs[2]);
+    printf("C=0x%02x,", bufs[2]);
 
-            printf("BCC=0x%02x,", bufs[3]);
-            
-            int bytes2 = write(fd, bufs, BUF_SIZE);
-            
-            printf("Bytes written = %d\n", bytes2);
-            
-            STOP = TRUE;
+    printf("BCC=0x%02x,", bufs[3]);
+    
+    int bytes2 = write(fd, bufs, BUF_SIZE);
+    
+    printf("Bytes written = %d\n", bytes2);
+    
               
-        }
-    }
-
     //FETCH UA to finish this
     STOP = FALSE;
     resetStateMachine();

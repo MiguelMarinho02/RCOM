@@ -6,7 +6,7 @@
 #define DATA_SIZE 200
 
 enum state{START,FLAG_RCV,A_RCV,C_RCV,BCC_RCV,DATA,BCC2_RCV,DONE};
-enum mode{SET_RES,UA_RES,DISC_REC,RR_REC,I_REC,RJ_REC};
+enum mode{SET_RES,UA_RES,DISC_REC,RR_REC,I_REC,RJ_REC}; //represents what kind of proccess it is going to do. In the case of failure in I_REC, we change to RJ_REC to show that it failed
 enum type{READER,TRANSMITER};
 
 struct state_machine
@@ -42,5 +42,5 @@ void bcc_rcv_process(unsigned char byte);
 
 void data_rcv_process(unsigned char byte);
 
-void bcc2_rcv_process(unsigned char byte);
+void bcc2_rcv_process();
 

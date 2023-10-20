@@ -1,8 +1,6 @@
 // Link layer protocol implementation
 
 #include "link_layer.h"
-#include "macros.h"
-#include "state_machine.h"
 
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
@@ -77,11 +75,11 @@ int writeInfo(const unsigned char *buffer,int bufSize){
 int llopen(LinkLayer connectionParameters)
 {
     if(connectionParameters.role ==  LlTx){type = TRANSMITER;}
-    else{type == READER;}
+    else{type = READER;}
 
     parameters = connectionParameters;
 
-    fd = open(connectionParameters.serialPort,, O_RDWR | O_NOCTTY);
+    fd = open(connectionParameters.serialPort, O_RDWR | O_NOCTTY);
     if (fd < 0)
     {
         perror(connectionParameters.serialPort);
@@ -131,9 +129,9 @@ int llopen(LinkLayer connectionParameters)
                 stateMachine(buf_2[0]);
             }
             if(state_machine_get_state() == DONE){
-                struct state_machine state_machine = getStateMachine();
                 STOP = TRUE;
-                //printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",state_machine.a,state_machine.c,state_machine.bcc);
+                /*struct state_machine state_machine = getStateMachine();
+                printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",state_machine.a,state_machine.c,state_machine.bcc);*/
                 alarm(0);
             }
             else if(counter == parameters.nRetransmissions){
@@ -164,9 +162,9 @@ int llopen(LinkLayer connectionParameters)
             }
             if (state_machine_get_state() == DONE){
                 bufs[0] = FLAG;
-                bufs[1] = A_RECEIVER;
+                bufs[1] = A_SENDER;
                 bufs[2] = UA;
-                bufs[3] = BCC(A_RECEIVER,UA);
+                bufs[3] = BCC(A_SENDER,UA);
                 bufs[4] = FLAG;
                             
                 //printf("A=0x%02x,C=0x%02x,BCC=0x%02x\n", bufs[1],bufs[2],bufs[3]);
@@ -203,18 +201,18 @@ int llwrite(const unsigned char *buf, int bufSize)
 
        if(state_machine_get_state() == DONE){
           struct state_machine state_machine = getStateMachine();
-          if(getStateMachine().type == RJ_REC){
+          if(state_machine.mode == RJ_REC){
             alarm(0);
-            resetStateMachine();
-            setStateMachine(RR_REC,TRANSMITER);
-            if(state_machine.c == RJ(0)){
+            if(state_machine.c == REJ(0)){
                 frameNumber = 0;
             }
-            else if(state_machine.c == RJ(1)){
+            else if(state_machine.c == REJ(1)){
                 frameNumber = 1;
             }
             else{}
-            writeInfo(buf,bufSize,frameNumber);
+            resetStateMachine();
+            setStateMachine(RR_REC,TRANSMITER);
+            writeInfo(buf,bufSize);
             alarm(parameters.timeout);
             counter = 0;
             continue;
@@ -227,7 +225,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                 frameNumber = 1;
             }
             else{
-                //repeated frame, wtf do I do with this
+                //repeated frame, I do nothing I guess
             }
             alarm(0);
           }
@@ -266,20 +264,31 @@ int llread(unsigned char *packet)
         //printf("state = %d\n",state_machine_get_state());
         if (state_machine_get_state() == DONE){
             struct state_machine state_machine = getStateMachine();
+            if(state_machine.mode == DISC_REC){
+                STOP = TRUE;
+                break;
+            }
             unsigned char bufs[SUPERVISION_SIZE] = {};
             bufs[0] = FLAG;
-            bufs[1] = A_RECEIVER;
-            if(state_machine.mode == RR_REC){
+            bufs[1] = A_SENDER;
+
+            if(state_machine.mode != RJ_REC){ //Success upon reading
                 if(state_machine.c == CTRL_S(0)){
+                    if(frameNumber == 0){ //not repeated packet
+                        memcpy(packet,state_machine.data,sizeof(char));
+                    }
                     bufs[2] = RR(1);
+                    frameNumber = 1;
                 }else{
+                    if(frameNumber == 1){ //not repeated packet
+                        memcpy(packet,state_machine.data,sizeof(char));
+                    }
                     bufs[2] = RR(0);
+                    frameNumber = 1;
                 }
-                //get the data
-                memcpy(packet,state_machine.data,sizeof(char));
             }
             else{
-                if(state_machine.c == CTRL_S(0)){
+                if(state_machine.c == CTRL_S(0)){  //in case it was rejected
                     bufs[2] = REJ(0);
                 }else{
                     bufs[2] = REJ(1);
@@ -301,7 +310,7 @@ int llread(unsigned char *packet)
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics,int fd)
+int llclose(int showStatistics)
 {
     if(type == TRANSMITER){
         resetStateMachine();
@@ -345,32 +354,18 @@ int llclose(int showStatistics,int fd)
         }
     }
     else{
-        resetStateMachine();
-        setStateMachine(DISC_REC,READER);
-        STOP = FALSE;
+
+        unsigned char bufs[SUPERVISION_SIZE] = {0};
+        bufs[0] = FLAG;
+        bufs[1] = A_RECEIVER;
+        bufs[2] = DISC;
+        bufs[3] = BCC(A_RECEIVER,DISC);
+        bufs[4] = FLAG;
+                    
+        //printf("A=0x%02x,C=0x%02x,BCC=0x%02x", bufs[1],bufs[2],bufs[3]);
         
-        while (STOP == FALSE)
-        {
-            unsigned char buf[1] = {0};
-            int bytes = read(fd, buf, 1);
-            if(bytes > 0){
-                //printf("byte received =0x%02x\n",buf[0]);
-                stateMachine(buf[0]);
-            }
-            if (state_machine_get_state() == DONE){
-                unsigned char bufs[SUPERVISION_SIZE] = {0};
-                bufs[0] = FLAG;
-                bufs[1] = A_RECEIVER;
-                bufs[2] = DISC;
-                bufs[3] = BCC(A_RECEIVER,DISC);
-                bufs[4] = FLAG;
-                            
-                //printf("A=0x%02x,C=0x%02x,BCC=0x%02x", bufs[1],bufs[2],bufs[3]);
-                
-                write(fd, bufs, SUPERVISION_SIZE);
-                STOP = TRUE;
-            }
-        }
+        write(fd, bufs, SUPERVISION_SIZE);
+               
 
         //FETCH UA to finish this
         STOP = FALSE;
@@ -391,7 +386,7 @@ int llclose(int showStatistics,int fd)
     }
 
     sleep(1);
-    if (tcsetattr(fd, TCSANOW, oldtio) == -1)
+    if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
     {
         perror("tcsetattr");
         exit(-1);

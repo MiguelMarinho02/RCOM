@@ -266,6 +266,7 @@ int main(int argc, char *argv[])
        if(bytes > 0){
         stateMachine(buf_2[0]);
        }
+       //printf("state = %d\n",state_machine_get_state());
        if(state_machine_get_state() == DONE){
           struct state_machine state_machine = getStateMachine();
           STOP = TRUE;

@@ -63,11 +63,15 @@ void stateMachine(unsigned char byte){
 }
 
 void flag_rcv_process(unsigned char byte){
-    if(state_machine.type == READER){
-        if(byte == FLAG){
-            return;
+    if(byte == FLAG){
+        return;
+    }
+    if(state_machine.mode == DISC_REC){
+        if(state_machine.type == READER && byte == A_SENDER){
+            state_machine.state = A_RCV;
+            state_machine.a = byte;
         }
-        else if(byte == A_SENDER){
+        else if(state_machine.type == TRANSMITER && byte == A_RECEIVER){
             state_machine.state = A_RCV;
             state_machine.a = byte;
         }
@@ -75,11 +79,8 @@ void flag_rcv_process(unsigned char byte){
             state_machine.state = START;
         }
     }
-    else if(state_machine.type == TRANSMITER){
-        if(byte == FLAG){
-            return;
-        }
-        else if(byte == A_RECEIVER){
+    else{
+        if(byte == A_SENDER){
             state_machine.state = A_RCV;
             state_machine.a = byte;
         }
@@ -87,15 +88,15 @@ void flag_rcv_process(unsigned char byte){
             state_machine.state = START;
         }
     }
-    else{};
 }
 
 void a_rcv_process(unsigned char byte){
+    if(byte == FLAG){
+        state_machine.state = FLAG_RCV;
+        return;
+    }
     if(state_machine.mode == SET_RES){
-        if(byte == FLAG){
-            state_machine.state = FLAG_RCV;
-        }
-        else if(byte == SET){
+        if(byte == SET){
             state_machine.state = C_RCV;
             state_machine.c = byte;
         }
@@ -104,10 +105,7 @@ void a_rcv_process(unsigned char byte){
         }
     }
     else if(state_machine.mode == UA_RES){
-        if(byte == FLAG){
-            state_machine.state = FLAG_RCV;
-        }
-        else if(byte == UA){
+        if(byte == UA){
             state_machine.state = C_RCV;
             state_machine.c = byte;
         }
@@ -116,10 +114,7 @@ void a_rcv_process(unsigned char byte){
         }
     }
     else if(state_machine.mode == RR_REC){
-        if(byte == FLAG){
-            state_machine.state = FLAG_RCV;
-        }
-        else if(byte == RR(0) || byte == RR(1)){
+        if(byte == RR(0) || byte == RR(1)){
             state_machine.state = C_RCV;
             state_machine.c = byte;
         }
@@ -133,22 +128,21 @@ void a_rcv_process(unsigned char byte){
         }
     }
     else if(state_machine.mode == I_REC){
-        if(byte == FLAG){
-            state_machine.state = FLAG_RCV;
-        }
-        else if(byte == CTRL_S(0) || byte == CTRL_S(1)){
+        if(byte == CTRL_S(0) || byte == CTRL_S(1)){
             state_machine.state = C_RCV;
             state_machine.c = byte;
+        }
+        else if(byte == DISC){
+            state_machine.state = C_RCV;
+            state_machine.c = byte;
+            state_machine.mode = DISC_REC;
         }
         else{
             state_machine.state = START;
         }
     }
     else if(state_machine.mode == DISC_REC){
-        if(byte == FLAG){
-            state_machine.state = FLAG_RCV;
-        }
-        else if(byte == DISC){
+        if(byte == DISC){
             state_machine.state = C_RCV;
             state_machine.c = byte;
         }
