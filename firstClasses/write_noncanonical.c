@@ -61,7 +61,7 @@ int writePackageInfo(int fd, unsigned char buffer[], int size, int frameNumber){
     buf[3] = BCC(buf[1],buf[2]);
     printf("A=0x%02X,C=0x%02X,BCC1=0x%02X,",buf[1],buf[2],buf[3]);
 
-    unsigned char bcc2 = buffer[0];
+    unsigned char bcc2 = 0x00;
     for(int i = 0; i < size; i++){
         bcc2 ^= buffer[i];
     }

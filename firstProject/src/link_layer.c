@@ -7,8 +7,6 @@
 #define SUPERVISION_SIZE 5
 #define MAX_INFO_SIZE 206 //RANDOM NUMBER + 6
 
-volatile int STOP = FALSE;
-
 volatile int alarmEnabled = FALSE;
 
 LinkLayer parameters;
@@ -36,7 +34,7 @@ int writeInfo(const unsigned char *buffer,int bufSize){
     buf[3] = BCC(buf[1],buf[2]);
     //printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",buf[1],buf[2],buf[3]);
 
-    unsigned char bcc2 = buffer[0];
+    unsigned char bcc2 = 0x00;
     for(int i = 0; i < bufSize; i++){
         bcc2 ^= buffer[i];
     }
@@ -65,8 +63,8 @@ int writeInfo(const unsigned char *buffer,int bufSize){
 
     buf[count + 1] = FLAG;
 
-    write(fd, buf, count + 2);   //6 is the number of header bytes like flag,a,c,etc...
-    return 0;
+    write(fd, buf, count + 2);  
+    return count - 6;
 }
 
 ////////////////////////////////////////////////
@@ -74,6 +72,7 @@ int writeInfo(const unsigned char *buffer,int bufSize){
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters)
 {
+    volatile int STOP = FALSE;
     if(connectionParameters.role ==  LlTx){type = TRANSMITER;}
     else{type = READER;}
 
@@ -184,10 +183,10 @@ int llopen(LinkLayer connectionParameters)
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize)
 {
+    volatile int STOP = FALSE;
     resetStateMachine();
     setStateMachine(RR_REC,TRANSMITER);
-    STOP = FALSE;
-    writeInfo(buf,bufSize); //the 4 number is also passed
+    int byte_written = writeInfo(buf,bufSize);
 
     alarm(parameters.timeout);
     int counter = 0;
@@ -241,7 +240,7 @@ int llwrite(const unsigned char *buf, int bufSize)
           alarm(parameters.timeout);
        }
     }
-    return 0;
+    return byte_written;
 }
 
 ////////////////////////////////////////////////
@@ -249,9 +248,10 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
+    volatile int STOP = FALSE;
     resetStateMachine();
     setStateMachine(I_REC,READER);
-    STOP = FALSE;
+    struct state_machine state_machine;
 
     while (STOP == FALSE)
     {
@@ -263,10 +263,9 @@ int llread(unsigned char *packet)
         }
         //printf("state = %d\n",state_machine_get_state());
         if (state_machine_get_state() == DONE){
-            struct state_machine state_machine = getStateMachine();
+            state_machine = getStateMachine();
             if(state_machine.mode == DISC_REC){
-                STOP = TRUE;
-                break;
+                return 0;
             }
             unsigned char bufs[SUPERVISION_SIZE] = {};
             bufs[0] = FLAG;
@@ -304,7 +303,7 @@ int llread(unsigned char *packet)
             STOP = TRUE;
         }
     }
-    return 0;
+    return state_machine.curIndx;
 }
 
 ////////////////////////////////////////////////
@@ -312,6 +311,7 @@ int llread(unsigned char *packet)
 ////////////////////////////////////////////////
 int llclose(int showStatistics)
 {
+    volatile int STOP = FALSE;
     if(type == TRANSMITER){
         resetStateMachine();
         setStateMachine(DISC_REC,TRANSMITER);
@@ -354,6 +354,21 @@ int llclose(int showStatistics)
         }
     }
     else{
+
+        resetStateMachine();
+        setStateMachine(DISC_REC,READER);
+        while (STOP == FALSE)
+        {
+            unsigned char buf[1] = {0};
+            int bytes = read(fd, buf, 1);
+            if(bytes > 0){
+                //printf("byte received =0x%02x\n",buf[0]);
+                stateMachine(buf[0]);
+            }
+            if (state_machine_get_state() == DONE){
+                STOP = TRUE;   
+            }
+        }
 
         unsigned char bufs[SUPERVISION_SIZE] = {0};
         bufs[0] = FLAG;

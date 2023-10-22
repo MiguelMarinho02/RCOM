@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
                 break;
             }
 
-            for(int i = 0; i < 5;i++){
+            for(int i = 0; i < state_machine.curIndx;i++){
                 printf("D=0x%02x\n", state_machine.data[i]);
             }
 

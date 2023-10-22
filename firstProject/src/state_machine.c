@@ -181,9 +181,13 @@ void bcc_rcv_process(unsigned char byte){
         }
         else{
             state_machine.state = DATA;
-            state_machine.bcc2 = byte;
-            state_machine.data[0] = byte;
-            state_machine.curIndx++;
+            if(byte == 0x7d){
+                escapeDetected = 1;
+            }
+            else{
+                state_machine.data[0] = byte;
+                state_machine.curIndx++;
+            }
         }
     }
     else{};
@@ -201,13 +205,7 @@ void data_rcv_process(unsigned char byte){
         }
         else{  //reverse engineer the stuffing process
             if(escapeDetected == 1){
-                if(byte == 0x5e){
-                    state_machine.data[state_machine.curIndx] = 0x7e;
-                }
-                else if(byte == 0x5d){
-                    state_machine.data[state_machine.curIndx] = 0x7d;
-                }
-                else{}
+                state_machine.data[state_machine.curIndx] = BCC(byte,0x20);
                 state_machine.curIndx++;
                 escapeDetected = 0;
             }
@@ -232,12 +230,13 @@ void bcc2_rcv_process(){
         for(int i = 0; i < state_machine.curIndx - 1; i++){
             bcc2 = BCC(bcc2,state_machine.data[i]);
         }
-
+        
         if(bcc2 != state_machine.data[state_machine.curIndx - 1]){
             state_machine.mode = RJ_REC;
+            return;
         }
 
         state_machine.state = DONE;
-
+        state_machine.curIndx--;
     }
 }
