@@ -20,6 +20,8 @@ struct termios newtio;
 
 int frameNumber = 0;
 
+int isForced = FALSE;
+
 void alarmHandler(int signal) // Defines the alarm
 {
     alarmEnabled = TRUE;
@@ -265,6 +267,7 @@ int llread(unsigned char *packet)
         if (state_machine_get_state() == DONE){
             state_machine = getStateMachine();
             if(state_machine.mode == DISC_REC){
+                isForced = TRUE;
                 return 0;
             }
             unsigned char bufs[SUPERVISION_SIZE] = {};
@@ -283,7 +286,7 @@ int llread(unsigned char *packet)
                         memcpy(packet,state_machine.data,sizeof(char));
                     }
                     bufs[2] = RR(0);
-                    frameNumber = 1;
+                    frameNumber = 0;
                 }
             }
             else{
@@ -355,18 +358,20 @@ int llclose(int showStatistics)
     }
     else{
 
-        resetStateMachine();
-        setStateMachine(DISC_REC,READER);
-        while (STOP == FALSE)
-        {
-            unsigned char buf[1] = {0};
-            int bytes = read(fd, buf, 1);
-            if(bytes > 0){
-                //printf("byte received =0x%02x\n",buf[0]);
-                stateMachine(buf[0]);
-            }
-            if (state_machine_get_state() == DONE){
-                STOP = TRUE;   
+        if(!isForced){   // in the event we were forced to leave by an early disc
+            resetStateMachine();
+            setStateMachine(DISC_REC,READER);
+            while (STOP == FALSE)
+            {
+                unsigned char buf[1] = {0};
+                int bytes = read(fd, buf, 1);
+                if(bytes > 0){
+                    //printf("byte received =0x%02x\n",buf[0]);
+                    stateMachine(buf[0]);
+                }
+                if (state_machine_get_state() == DONE){
+                    STOP = TRUE;   
+                }
             }
         }
 
