@@ -236,6 +236,7 @@ void bcc2_rcv_process(){
             return;
         }
 
+        printf("everything alright with this one \n\n");
         state_machine.state = DONE;
         state_machine.curIndx--;
     }

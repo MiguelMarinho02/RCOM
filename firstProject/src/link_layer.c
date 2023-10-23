@@ -5,7 +5,7 @@
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 #define SUPERVISION_SIZE 5
-#define MAX_INFO_SIZE 206 //RANDOM NUMBER + 6
+#define MAX_INFO_SIZE 2006 //RANDOM NUMBER + 6
 
 volatile int alarmEnabled = FALSE;
 
@@ -203,7 +203,6 @@ int llwrite(const unsigned char *buf, int bufSize)
        if(state_machine_get_state() == DONE){
           struct state_machine state_machine = getStateMachine();
           if(state_machine.mode == RJ_REC){
-            alarm(0);
             if(state_machine.c == REJ(0)){
                 frameNumber = 0;
             }
@@ -260,10 +259,8 @@ int llread(unsigned char *packet)
         unsigned char buf[1] = {0};
         int bytes = read(fd, buf, 1);
         if(bytes > 0){
-            //printf("byte received =0x%02x\n",buf[0]);
             stateMachine(buf[0]);
         }
-        //printf("state = %d\n",state_machine_get_state());
         if (state_machine_get_state() == DONE){
             state_machine = getStateMachine();
             if(state_machine.mode == DISC_REC){
