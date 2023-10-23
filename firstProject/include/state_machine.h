@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#define DATA_SIZE 2000
+#define DATA_SIZE 2006
 
 enum state{START,FLAG_RCV,A_RCV,C_RCV,BCC_RCV,DATA,BCC2_RCV,DONE};
 enum mode{SET_RES,UA_RES,DISC_REC,RR_REC,I_REC,RJ_REC}; //represents what kind of proccess it is going to do. In the case of failure in I_REC, we change to RJ_REC to show that it failed

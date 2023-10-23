@@ -58,48 +58,56 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             exit(-1);
         }
 
-        int fileBegin = ftell(file);
-        fseek(file,0L,SEEK_END);
-        long int fileSize = ftell(file)-fileBegin;
-        fseek(file,fileBegin,SEEK_SET);
+        struct stat file_st;
+        if (stat(filename, &file_st) != 0) {
+            printf("Error in stat\n");
+            exit(1);
+        }
+        size_t fileSize = file_st.st_size;
 
         int packetSize = 0;
         getControlPacket(2,packet,fileSize,filename,&packetSize);
         llwrite(packet,packetSize);  
-        memset(packet, (unsigned char)0, MAX_PAYLOAD_SIZE);
         int bytesLeft = fileSize;
 
         while (bytesLeft >= 0) { 
                 int dataSize = bytesLeft > (long int) MAX_PAYLOAD_SIZE ? MAX_PAYLOAD_SIZE : bytesLeft;
                 fread(packet, sizeof(unsigned char), dataSize, file);
-                printf("sending another - ");
                 if(llwrite(packet, dataSize) == -1) {
                     printf("Exit: error in data packets\n");
                     exit(-1);
                 }
+
+                for(int i = 0; i < dataSize; i++){
+                    printf("%d,",packet[i]);
+                }
+
+                printf("\n\n");
                 
-                bytesLeft -= (long int) MAX_PAYLOAD_SIZE;
-                memset(packet, (unsigned char)0, MAX_PAYLOAD_SIZE);   
+                bytesLeft -= (long int) MAX_PAYLOAD_SIZE; 
         }
 
         fclose(file);    
         getControlPacket(3,packet,fileSize,filename,&packetSize);
         llwrite(packet,packetSize); 
-        memset(packet, (unsigned char)0, MAX_PAYLOAD_SIZE);
     }
     else{
         unsigned char packet[MAX_PAYLOAD_SIZE];
-        FILE *outputFile = fopen(filename, "ab");
-        while(1){
-            memset(packet, 0, MAX_PAYLOAD_SIZE * sizeof(unsigned char));
-            int packet_size = llread(packet);
-            if(packet[0] == 2){
-                continue;
-            }
+        FILE *outputFile = fopen(filename, "wb+");
+        int packet_size;
+        while((packet_size = llread(packet)) > 0){
             if(packet_size == 0 || packet[0] == 3){
                 break;
             }
+            if(packet_size == 24){
+                continue;
+            }
 
+            for(int i = 0; i < packet_size; i++){
+                printf("%d,",packet[i]);
+            }
+
+            printf("\n\n");
 
             if (fwrite(packet, 1, packet_size, outputFile) != packet_size) {
                 perror("Failed to write to the file");

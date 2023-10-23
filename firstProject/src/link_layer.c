@@ -34,10 +34,10 @@ int writeInfo(const unsigned char *buffer,int bufSize){
     buf[1] = A_SENDER;
     buf[2] = CTRL_S(frameNumber);
     buf[3] = BCC(buf[1],buf[2]);
-    //printf("A=0x%02X,C=0x%02X,BCC1=0x%02X\n",buf[1],buf[2],buf[3]);
 
     unsigned char bcc2 = 0x00;
     for(int i = 0; i < bufSize; i++){
+        //printf("%d,",buffer[i]);
         bcc2 ^= buffer[i];
     }
 
@@ -55,6 +55,7 @@ int writeInfo(const unsigned char *buffer,int bufSize){
     }
 
     if(bcc2 == FLAG || bcc2 == ESC){
+        //printf("bcc2 == esc or flag\n");
         buf[count] = 0x7d;
         count++;
         buf[count] = BCC(bcc2,0x20);
@@ -62,11 +63,11 @@ int writeInfo(const unsigned char *buffer,int bufSize){
     else{
         buf[count] = bcc2;
     }
-
-    buf[count + 1] = FLAG;
-
-    write(fd, buf, count + 2);  
-    return count - 6;
+    count++;
+    buf[count] = FLAG;
+    count++;
+    write(fd, buf, count);  
+    return count;
 }
 
 ////////////////////////////////////////////////
@@ -270,17 +271,17 @@ int llread(unsigned char *packet)
             unsigned char bufs[SUPERVISION_SIZE] = {};
             bufs[0] = FLAG;
             bufs[1] = A_SENDER;
-
+            
             if(state_machine.mode != RJ_REC){ //Success upon reading
                 if(state_machine.c == CTRL_S(0)){
                     if(frameNumber == 0){ //not repeated packet
-                        memcpy(packet,state_machine.data,sizeof(char));
+                        memcpy(packet, state_machine.data, state_machine.curIndx);
                     }
                     bufs[2] = RR(1);
                     frameNumber = 1;
                 }else{
                     if(frameNumber == 1){ //not repeated packet
-                        memcpy(packet,state_machine.data,sizeof(char));
+                        memcpy(packet, state_machine.data, state_machine.curIndx);
                     }
                     bufs[2] = RR(0);
                     frameNumber = 0;
@@ -303,6 +304,13 @@ int llread(unsigned char *packet)
             STOP = TRUE;
         }
     }
+
+    /*for(int i = 0; i < state_machine.curIndx; i++){
+            printf("%d,",packet[i]);
+        }
+
+    printf("\n\n");*/
+
     return state_machine.curIndx;
 }
 

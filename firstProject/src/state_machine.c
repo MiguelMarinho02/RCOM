@@ -185,8 +185,10 @@ void bcc_rcv_process(unsigned char byte){
                 escapeDetected = 1;
             }
             else{
-                state_machine.data[0] = byte;
+                state_machine.data[state_machine.curIndx] = byte;
                 state_machine.curIndx++;
+                state_machine.bcc2 ^= byte;
+                escapeDetected = 0;
             }
         }
     }
@@ -205,7 +207,8 @@ void data_rcv_process(unsigned char byte){
         }
         else{  //reverse engineer the stuffing process
             if(escapeDetected == 1){
-                state_machine.data[state_machine.curIndx] = BCC(byte,0x20);
+                state_machine.data[state_machine.curIndx] = BCC(0x20,byte);
+                state_machine.bcc2 ^= BCC(0x20,byte);
                 state_machine.curIndx++;
                 escapeDetected = 0;
             }
@@ -216,6 +219,7 @@ void data_rcv_process(unsigned char byte){
                 else{
                     state_machine.data[state_machine.curIndx] = byte;
                     state_machine.curIndx++;
+                    state_machine.bcc2 ^= byte;
                 }
             }
         }
@@ -225,19 +229,24 @@ void data_rcv_process(unsigned char byte){
 
 void bcc2_rcv_process(){
     if(state_machine.mode == I_REC){
-        unsigned char bcc2 = 0x00;
+        state_machine.curIndx--;
+        state_machine.bcc2 = state_machine.data[state_machine.curIndx] ^ state_machine.bcc2;
 
-        for(int i = 0; i < state_machine.curIndx - 1; i++){
-            bcc2 = BCC(bcc2,state_machine.data[i]);
+        /*for(int i = 0; i < state_machine.curIndx; i++){
+            printf("%d,",state_machine.data[i]);
         }
-        
-        if(bcc2 != state_machine.data[state_machine.curIndx - 1]){
+
+        printf("\n\n");*/
+
+        //printf("\n\ncurIndex = %d\n",state_machine.curIndx);
+        if(state_machine.bcc2 != state_machine.data[state_machine.curIndx]){
             state_machine.mode = RJ_REC;
+            state_machine.state = DONE;
+            //printf("everything is fucked with this one \n");
             return;
         }
 
-        printf("everything alright with this one \n\n");
+        //printf("everything alright with this one \n");
         state_machine.state = DONE;
-        state_machine.curIndx--;
     }
 }
