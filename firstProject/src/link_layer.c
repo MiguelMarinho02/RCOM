@@ -76,6 +76,7 @@ int writeInfo(const unsigned char *buffer,int bufSize){
 int llopen(LinkLayer connectionParameters)
 {
     volatile int STOP = FALSE;
+    (void)signal(SIGALRM, alarmHandler);
     if(connectionParameters.role ==  LlTx){type = TRANSMITER;}
     else{type = READER;}
 

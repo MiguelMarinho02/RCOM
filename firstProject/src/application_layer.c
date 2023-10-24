@@ -50,6 +50,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         exit(-1);
     }
 
+    sleep(3);
+
     if(connectionParameters.role == LlTx){
         FILE *file = fopen(filename, "rb");
         unsigned char packet[MAX_PAYLOAD_SIZE];
@@ -78,11 +80,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                     exit(-1);
                 }
 
-                for(int i = 0; i < dataSize; i++){
+                /*for(int i = 0; i < dataSize; i++){
                     printf("%d,",packet[i]);
                 }
 
-                printf("\n\n");
+                printf("\n\n");*/
                 
                 bytesLeft -= (long int) MAX_PAYLOAD_SIZE; 
         }
@@ -103,11 +105,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 continue;
             }
 
-            for(int i = 0; i < packet_size; i++){
+            /*for(int i = 0; i < packet_size; i++){
                 printf("%d,",packet[i]);
             }
 
-            printf("\n\n");
+            printf("\n\n");*/
 
             if (fwrite(packet, 1, packet_size, outputFile) != packet_size) {
                 perror("Failed to write to the file");
