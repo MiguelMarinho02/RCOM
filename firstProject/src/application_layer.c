@@ -35,6 +35,16 @@ void getControlPacket(int type, unsigned char *packet, long int fileSize, const 
     *size = cont;
 }
 
+void buildDataPacket(unsigned char *controlPacket,unsigned char *packet,int size){
+    controlPacket[0] = 1;
+    controlPacket[1] = size / 256;
+    controlPacket[2] = size % 256;
+
+    for (size_t i = 0; i < size; i++) {
+        controlPacket[3+i] = packet[i];
+    }
+}
+
 
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename)
@@ -49,8 +59,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     if(llopen(connectionParameters) < 0){
         exit(-1);
     }
-
-    sleep(3);
 
     if(connectionParameters.role == LlTx){
         FILE *file = fopen(filename, "rb");
@@ -75,7 +83,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         while (bytesLeft >= 0) { 
                 int dataSize = bytesLeft > (long int) MAX_PAYLOAD_SIZE ? MAX_PAYLOAD_SIZE : bytesLeft;
                 fread(packet, sizeof(unsigned char), dataSize, file);
-                if(llwrite(packet, dataSize) == -1) {
+                unsigned char controlPacket[MAX_PAYLOAD_SIZE + 3];
+                buildDataPacket(controlPacket,packet,dataSize);
+                if(llwrite(controlPacket, dataSize+3) == -1) {
                     printf("Exit: error in data packets\n");
                     exit(-1);
                 }
@@ -95,26 +105,30 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     }
     else{
         unsigned char packet[MAX_PAYLOAD_SIZE];
+        unsigned char controlPacket[MAX_PAYLOAD_SIZE + 3];
         FILE *outputFile = fopen(filename, "wb+");
         int packet_size;
-        while((packet_size = llread(packet)) > 0){
-            if(packet_size == 0 || packet[0] == 3){
+        while((packet_size = llread(controlPacket)) > 0){
+            if(controlPacket[0] == 2){
+                continue;;
+            }
+            if(controlPacket[0] == 3){
                 break;
             }
-            if(packet_size == 24){
-                continue;
-            }
-
-            /*for(int i = 0; i < packet_size; i++){
+            if(controlPacket[0] == 1){
+                /*for(int i = 0; i < packet_size; i++){
                 printf("%d,",packet[i]);
-            }
+                }
 
-            printf("\n\n");*/
+                printf("\n\n");*/
 
-            if (fwrite(packet, 1, packet_size, outputFile) != packet_size) {
-                perror("Failed to write to the file");
-                fclose(outputFile);
-                llclose(0);
+                memcpy(packet,controlPacket+3,packet_size-3);
+
+                if (fwrite(packet, 1, packet_size-3, outputFile) != packet_size-3) {
+                    perror("Failed to write to the file");
+                    fclose(outputFile);
+                    llclose(0);
+                }
             }
 
         }
