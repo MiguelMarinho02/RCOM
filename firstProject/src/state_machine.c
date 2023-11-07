@@ -242,7 +242,7 @@ void bcc2_rcv_process(){
         if(state_machine.bcc2 != state_machine.data[state_machine.curIndx]){
             state_machine.mode = RJ_REC;
             state_machine.state = DONE;
-            //printf("everything is fucked with this one \n");
+            //printf("everything is not alright with this one \n");
             return;
         }
 
